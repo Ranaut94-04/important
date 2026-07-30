@@ -297,9 +297,9 @@ def title_overlay(text, font_key, size_frac, y_frac, start, dur,
     y = int(fh * y_frac)
     if shadow:
         sh = (_txt(text, font_key, size_frac, "#3A2A1C")
-              .with_position(("center", y + int(fw * 0.006)))
+              .with_position(("center", y + int(fw * 0.007)))
               .with_start(start).with_duration(dur)
-              .with_opacity(0.5)
+              .with_opacity(0.62)
               .with_effects([vfx.CrossFadeIn(fin), vfx.CrossFadeOut(fout)]))
         clips.append(sh)
     main = (main.with_position(("center", y))
@@ -431,20 +431,21 @@ def end_card(duration):
     # script accent
     layers += title_overlay("handmade with love", "script", 0.075, 0.30,
                             0.15, duration - 0.15, color="#B24A5E", shadow=False)
-    # logo: serif, ink/blur-ish reveal approximated with fade + settle scale
-    logo = (_txt("THE WOOLLY AFFAIRS", "serif", 0.085, "#5A4632", box_w=0.92)
-            .with_position(("center", int(fh * 0.42)))
+    # logo: serif, ink/blur-ish reveal approximated with fade + settle scale.
+    # 0.066 keeps "THE WOOLLY AFFAIRS" on a single line inside box_w.
+    logo = (_txt("THE WOOLLY AFFAIRS", "serif", 0.066, "#5A4632", box_w=0.94)
+            .with_position(("center", int(fh * 0.43)))
             .with_start(0.35).with_duration(duration - 0.35)
             .with_effects([vfx.CrossFadeIn(0.6),
                            vfx.Resize(lambda t: 1.06 - 0.06 * ease_out(min(t / 0.8, 1)))]))
     layers.append(logo)
     # supporting lines, staggered (§2)
     layers += title_overlay("Handmade Gifts · Crochet Creations · Custom Orders",
-                            "sans", 0.030, 0.56, 1.1, duration - 1.1,
+                            "sans", 0.029, 0.55, 1.1, duration - 1.1,
                             color="#6B5540", shadow=False)
-    layers += title_overlay("DM to order", "sans_bold", 0.036, 0.61, 1.35,
+    layers += title_overlay("DM to order", "sans_bold", 0.036, 0.62, 1.35,
                             duration - 1.35, color="#5A4632", shadow=False)
-    layers += title_overlay("Follow @thewoollyaffairs", "sans_bold", 0.040, 0.70,
+    layers += title_overlay("Follow @thewoollyaffairs", "sans_bold", 0.040, 0.71,
                             1.6, duration - 1.6, color="#B24A5E", shadow=False)
     return CompositeVideoClip(layers, size=FRAME).with_duration(duration)
 
@@ -466,8 +467,9 @@ class Scene:
 
 TIMELINE = [
     Scene(0.0, 3.0, "kb", role="hook", zoom=(1.18, 1.0),  # push then reveal (pull back)
-          titles=[("Some gifts fade…", "serif_reg", 0.058, 0.40),
-                  ("Handmade memories don't.", "serif", 0.064, 0.48)]),
+          # staggered: line 1 lands early, line 2 fades up on the reveal (§2 hook)
+          titles=[("Some gifts fade…", "serif_reg", 0.056, 0.38, 0.3, 2.6),
+                  ("Handmade memories don't.", "serif", 0.062, 0.50, 1.5, 1.5)]),
     Scene(3.0, 6.0, "kb", role="bunny", zoom=(1.0, 1.05),
           titles=[("Handmade with love", "script", 0.085, 0.72)]),
     Scene(6.0, 9.0, "kb", role="roses", zoom=(1.02, 1.07),
@@ -536,6 +538,14 @@ def build_grade(add_grain=True):
 # --------------------------------------------------------------------------- #
 # Assemble
 # --------------------------------------------------------------------------- #
+def _title_from_spec(spec, scene_dur, default_start):
+    """Title tuple may be (text, font, size_frac, y_frac) or add (start, dur)."""
+    text, fk, sf, yf = spec[0], spec[1], spec[2], spec[3]
+    start = spec[4] if len(spec) > 4 else default_start
+    dur = spec[5] if len(spec) > 5 else scene_dur - 0.2
+    return title_overlay(text, fk, sf, yf, start, dur)
+
+
 def build_scene_clip(sc: Scene):
     dur = sc.end - sc.start
     tail = XF if sc.end < DURATION else 0.0  # extend into next scene for the dissolve
@@ -543,14 +553,14 @@ def build_scene_clip(sc: Scene):
     if sc.kind == "kb":
         base = ken_burns(sc.role, d, zoom=sc.zoom, pan=sc.pan)
         layers = [base]
-        for (text, fk, sf, yf) in sc.titles:
-            layers += title_overlay(text, fk, sf, yf, 0.35, dur - 0.2)
+        for spec in sc.titles:
+            layers += _title_from_spec(spec, dur, default_start=0.35)
         clip = CompositeVideoClip(layers, size=FRAME).with_duration(d)
     elif sc.kind == "pop":
         base = pop_montage(sc.roles, d)
         layers = [base]
-        for (text, fk, sf, yf) in sc.titles:
-            layers += title_overlay(text, fk, sf, yf, 0.3, dur - 0.2)
+        for spec in sc.titles:
+            layers += _title_from_spec(spec, dur, default_start=0.3)
         clip = CompositeVideoClip(layers, size=FRAME).with_duration(d)
     elif sc.kind == "seq":
         clip = sequence_scene(sc.roles, d)
