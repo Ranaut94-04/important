@@ -262,7 +262,8 @@ def ken_burns(role, duration, zoom=(1.0, 1.06), pan=(0.0, 0.0), ease=smoothstep)
         left = int(round(min(max(cx - win_w / 2, 0), W - win_w)))
         top = int(round(min(max(cy - win_h / 2, 0), H - win_h)))
         crop = src[top:top + int(round(win_h)), left:left + int(round(win_w))]
-        return np.array(Image.fromarray(crop).resize((fw, fh), Image.LANCZOS))
+        # BILINEAR is ~2x faster than LANCZOS and indistinguishable in motion video.
+        return np.array(Image.fromarray(crop).resize((fw, fh), Image.BILINEAR))
 
     return VideoClip(make_frame, duration=duration).with_duration(duration)
 
@@ -500,6 +501,13 @@ def build_grade(add_grain=True):
     vig = np.clip(1.0 - 0.28 * np.clip(d - 0.35, 0, 1), 0.72, 1.0).astype(np.float32)
     vig = vig[..., None]
 
+    # Pre-baked grain: cheap quarter-res textures cycled per frame instead of
+    # drawing millions of fresh randoms every frame (that was a real cost).
+    gh, gw = fh // 4, fw // 4
+    grain_bank = [np.random.normal(0, 2.2, (gh, gw, 1)).astype(np.float32)
+                  for _ in range(12)]
+    counter = {"i": 0}
+
     def grade(frame):
         f = frame.astype(np.float32)
         # matte / lifted low-contrast base: pull toward mid, lift blacks (§9)
@@ -517,7 +525,9 @@ def build_grade(add_grain=True):
         # vignette (warm, low strength)
         f *= vig
         if add_grain:
-            f += np.random.normal(0, 2.2, f.shape).astype(np.float32)
+            g = grain_bank[counter["i"] % len(grain_bank)]
+            counter["i"] += 1
+            f += np.repeat(np.repeat(g, 4, axis=0), 4, axis=1)[:f.shape[0], :f.shape[1]]
         return np.clip(f, 0, 255).astype(np.uint8)
 
     return grade
@@ -636,7 +646,7 @@ def main():
         audio_codec="aac",
         audio_bitrate="320k",
         bitrate="28000k",              # high; IG re-encodes (§13)
-        preset="medium",
+        preset="veryfast",
         ffmpeg_params=["-pix_fmt", "yuv420p", "-profile:v", "high",
                        "-g", str(args.fps * 1)],  # ~1s keyframe interval
         threads=os.cpu_count() or 4,
