@@ -1,0 +1,4 @@
+moviepy>=2.0
+numpy>=1.24
+pillow>=10.0
+imageio-ffmpeg>=0.5   # bundles an ffmpeg binary; no system ffmpeg needed
