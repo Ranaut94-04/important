@@ -1,0 +1,12 @@
+# rendered output
+out/
+*.mp4
+
+# generated audio (bring your own)
+*.wav
+*.mp3
+*.aac
+
+# python
+__pycache__/
+*.pyc
